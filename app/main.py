@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 import aiohttp
 from aiogram import Bot, Dispatcher, F, Router
@@ -12,6 +13,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
 from .config import Settings
 from .generator_client import GenerationRequest, GeneratorClient
+from .local_generator import LocalGenerator
 from .keyboards import mode_keyboard, yes_no_keyboard
 from .states import ConfigFlow
 
@@ -237,7 +239,11 @@ async def run() -> None:
     dp.include_router(router)
 
     async with aiohttp.ClientSession() as session:
-        client = GeneratorClient(settings.generator_api_base_url, session)
+        use_remote = os.getenv("USE_REMOTE_GENERATOR", "true").lower() not in {"0", "false", "no"}
+        if use_remote:
+            client = GeneratorClient(settings.generator_api_base_url, session)
+        else:
+            client = LocalGenerator()
         dp["client"] = client
 
         bot = Bot(token=settings.bot_token)
