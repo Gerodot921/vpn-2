@@ -14,6 +14,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from .config import Settings
 from .generator_client import GenerationRequest, GeneratorClient
 from .local_generator import LocalGenerator
+from .amnezia_ssh import create_peer
 from .keyboards import mode_keyboard, yes_no_keyboard
 from .states import ConfigFlow
 
@@ -141,6 +142,24 @@ async def quickconfig(message: Message, client: GeneratorClient) -> None:
         document=document,
         caption="Конфиг готов (режим: legacy, DNS: cloudflare).",
     )
+
+
+@router.message(Command("amnezia_quick"))
+async def amnezia_quick(message: Message) -> None:
+    """Generate peer on remote Amnezia via SSH and send ready config."""
+    await message.answer("Создаю пользователя на сервере Amnezia и генерирую конфиг...")
+    try:
+        # load settings from env inside handler
+        from .config import Settings
+        settings = Settings.from_env()
+        conf_text, meta = await create_peer(settings)
+    except Exception as exc:
+        await message.answer(f"Не удалось создать пользователя: {exc}")
+        return
+
+    filename = "AmneziaVPN-remote.conf"
+    document = BufferedInputFile(conf_text.encode("utf-8"), filename=filename)
+    await message.answer_document(document=document, caption="Готовый конфиг Amnezia (создан на сервере)")
 
 
 @router.message(Command("config"))

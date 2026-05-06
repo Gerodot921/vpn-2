@@ -45,6 +45,31 @@ USE_REMOTE_GENERATOR=false
 
 Локальный генератор создаёт WireGuard/Amnezia-совместимый конфиг и отправляет его как файл.`
 
+Работа с удалённым сервером Amnezia (через SSH)
+
+Если у вас есть развернутый сервер Amnezia в Docker и вы хотите, чтобы бот автоматически создавал клиентов на сервере и выдавал готовые конфиги, задайте в `.env` параметры SSH и WireGuard:
+
+```
+SSH_HOST=151.243.176.102
+SSH_USER=root
+SSH_PORT=22
+SSH_KEY_PATH=/root/.ssh/id_rsa    # или SSH_PASSWORD
+
+WIREGUARD_DOCKER_CONTAINER=amnezia-awg
+WIREGUARD_INTERFACE_NAME=wg0
+WIREGUARD_ENDPOINT_HOST=151.243.176.102
+WIREGUARD_ENDPOINT_PORT=48360
+WIREGUARD_CLIENT_NETWORK_PREFIX=10.8.1
+WIREGUARD_CLIENT_START_OCTET=16
+WIREGUARD_ALLOWED_IPS=0.0.0.0/0
+WIREGUARD_DNS=1.1.1.1,8.8.8.8
+WIREGUARD_MTU=1280
+```
+
+После этого пользователь в Telegram может отправить команду `/amnezia_quick` — бот подключится к серверу по SSH, сгенерирует ключи клиента, добавит пир в WireGuard на сервере и вернёт готовый `.conf` файл.
+
+Внимание: бот использует `wg set` внутри контейнера для добавления пиров; убедитесь, что контейнер `amnezia-awg` имеет установленный `wireguard-tools` и что команда `wg` доступна внутри контейнера.
+
 ## Команды
 
 - `/start` — краткая справка.
