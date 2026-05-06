@@ -4,6 +4,14 @@ from dataclasses import dataclass
 import os
 from urllib.parse import urlparse
 
+# Load .env automatically when available
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    # If python-dotenv is not installed, continue — env must be provided by the environment
+    pass
+
 
 @dataclass(frozen=True)
 class Settings:
