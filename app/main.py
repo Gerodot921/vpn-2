@@ -108,8 +108,38 @@ async def _generate_and_send(message: Message, state: FSMContext, client: Genera
 @router.message(CommandStart())
 async def start(message: Message) -> None:
     await message.answer(
-        "Это бот для генерации конфигов AmneziaWG.\n"
-        "Введите /config, чтобы собрать конфиг по шагам."
+        "Это бот для генерации конфигов AmneziaWG.\n\n"
+        "/quickconfig — быстро генерировать конфиг с параметрами по умолчанию\n"
+        "/config — пошаговая генерация с выбором параметров\n"
+        "/cancel — отмена текущего диалога"
+    )
+
+
+@router.message(Command("quickconfig"))
+async def quickconfig(message: Message, client: GeneratorClient) -> None:
+    """Generate and send config instantly with default parameters."""
+    await message.answer("Генерирую конфиг с параметрами по умолчанию...")
+    request = GenerationRequest(
+        mode="legacy",
+        template=DEFAULTS["legacy"]["template"],
+        dns=DEFAULTS["legacy"]["dns"],
+        presets=None,
+        peer_endpoint=None,
+        keepalive=None,
+        i1=None,
+        i1_ref=None,
+    )
+    try:
+        conf_text, meta = await client.generate(request)
+    except Exception as exc:
+        await message.answer(f"Ошибка при генерации: {exc}")
+        return
+
+    filename = "AmneziaVPN-legacy.conf"
+    document = BufferedInputFile(conf_text.encode("utf-8"), filename=filename)
+    await message.answer_document(
+        document=document,
+        caption="Конфиг готов (режим: legacy, DNS: cloudflare).",
     )
 
 
