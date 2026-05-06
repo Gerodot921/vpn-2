@@ -29,11 +29,17 @@ def _ssh_connect(settings: Settings) -> paramiko.SSHClient:
         "port": settings.ssh_port or 22,
         "timeout": 10,
     }
+    # Prefer explicit auth method. Disable agent/keys lookup when using password to avoid unexpected key attempts.
+    connect_kwargs["allow_agent"] = False
+    connect_kwargs["look_for_keys"] = False
     if settings.ssh_key_path:
         connect_kwargs["key_filename"] = settings.ssh_key_path
     if settings.ssh_password:
         connect_kwargs["password"] = settings.ssh_password
-    client.connect(**connect_kwargs)
+    try:
+        client.connect(**connect_kwargs)
+    except paramiko.AuthenticationException as exc:
+        raise RuntimeError("SSH authentication failed. Проверьте SSH_KEY_PATH или SSH_PASSWORD и права доступа.") from exc
     return client
 
 
