@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amnezia-tg-bot"
+version = "0.1.0"
+description = "Telegram bot for generating AmneziaWG configs"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "aiogram>=3.4.1,<4",
+  "aiohttp>=3.9,<4",
+]
+
+[project.scripts]
+amnezia-bot = "app.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+include = ["app*"]
