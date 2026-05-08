@@ -52,6 +52,23 @@ def _run_ssh(cmd: str, client: paramiko.SSHClient) -> str:
     return out.strip()
 
 
+def _parse_wg_conf(conf_text: str) -> dict[str, str]:
+    """Parse simple key = value pairs from wg0.conf Interface section."""
+    out: dict[str, str] = {}
+    section = None
+    for line in conf_text.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.startswith('[') and line.endswith(']'):
+            section = line[1:-1].strip()
+            continue
+        if '=' in line and section == 'Interface':
+            k, v = line.split('=', 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
 def _find_next_ip(dump_output: str, prefix: str, start_octet: int) -> str:
     used = set()
     for line in dump_output.splitlines():
@@ -80,12 +97,36 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
             container = settings.wg_docker_container or "amnezia-awg"
             iface = settings.wg_interface_name or "wg0"
 
+            # try read wg0.conf inside container to extract server AWG params
+            conf_text = None
+            try:
+                conf_text = _run_ssh(f"docker exec {container} cat /opt/amnezia/awg/wg0.conf", client)
+            except Exception:
+                conf_text = None
+
+            conf_values: dict[str, str] = {}
+            if conf_text:
+                try:
+                    conf_values = _parse_wg_conf(conf_text)
+                except Exception:
+                    conf_values = {}
+
             # get existing peers dump
             dump_cmd = f"docker exec {container} wg show {iface} dump || true"
             dump = _run_ssh(dump_cmd, client)
 
-            prefix = settings.wg_client_network_prefix or "10.8.1"
+            # derive client address prefix and start octet
+            prefix = settings.wg_client_network_prefix or None
             start = settings.wg_client_start_octet or 16
+            if not prefix and conf_values.get('Address'):
+                # Address might be like 10.8.1.0/24 or 10.8.1.125/32
+                addr = conf_values.get('Address').split(',')[0].strip()
+                # take first ipv4 and convert to prefix
+                m = re.search(r"(\d+\.\d+\.\d+)\.\d+", addr)
+                if m:
+                    prefix = m.group(1)
+            if not prefix:
+                prefix = '10.8.1'
             client_ip = _find_next_ip(dump, prefix, start)
 
             # add peer
@@ -103,24 +144,34 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 except Exception:
                     server_pub = None
 
-            endpoint_host = settings.wg_endpoint_host or ""
-            endpoint_port = settings.wg_endpoint_port or 0
+            # Determine endpoint host/port
+            endpoint_host = settings.wg_endpoint_host or conf_values.get('ListenPort') and settings.wg_endpoint_host or settings.ssh_host or ''
+            # prefer explicit env port, else use ListenPort from conf
+            endpoint_port = settings.wg_endpoint_port or None
+            if not endpoint_port and conf_values.get('ListenPort'):
+                try:
+                    endpoint_port = int(conf_values.get('ListenPort'))
+                except Exception:
+                    endpoint_port = None
+            if not endpoint_port:
+                endpoint_port = 0
 
             # Build config text (include AWG/legacy obfuscation fields to be Amnezia-compatible)
-            dns = settings.wg_dns or "1.1.1.1,8.8.8.8"
-            mtu = settings.wg_mtu or 1280
+            dns = settings.wg_dns or conf_values.get('DNS') or "1.1.1.1,8.8.8.8"
+            mtu = settings.wg_mtu or (int(conf_values.get('MTU')) if conf_values.get('MTU') else 1280)
 
-            jc = settings.awg_jc or 6
-            jmin = settings.awg_jmin or 10
-            jmax = settings.awg_jmax or 50
-            s1 = settings.awg_s1 if settings.awg_s1 is not None else 0
-            s2 = settings.awg_s2 if settings.awg_s2 is not None else 0
-            s3 = settings.awg_s3 if settings.awg_s3 is not None else 16
-            s4 = settings.awg_s4 if settings.awg_s4 is not None else 0
-            h1 = settings.awg_h1 or '1'
-            h2 = settings.awg_h2 or '2'
-            h3 = settings.awg_h3 or '3'
-            h4 = settings.awg_h4 or '4'
+            # AWG params: prefer values from server conf, then .env, then safe defaults
+            jc = int(conf_values.get('Jc')) if conf_values.get('Jc') else (settings.awg_jc or 6)
+            jmin = int(conf_values.get('Jmin')) if conf_values.get('Jmin') else (settings.awg_jmin or 10)
+            jmax = int(conf_values.get('Jmax')) if conf_values.get('Jmax') else (settings.awg_jmax or 50)
+            s1 = int(conf_values.get('S1')) if conf_values.get('S1') else (settings.awg_s1 if settings.awg_s1 is not None else 0)
+            s2 = int(conf_values.get('S2')) if conf_values.get('S2') else (settings.awg_s2 if settings.awg_s2 is not None else 0)
+            s3 = int(conf_values.get('S3')) if conf_values.get('S3') else (settings.awg_s3 if settings.awg_s3 is not None else 16)
+            s4 = int(conf_values.get('S4')) if conf_values.get('S4') else (settings.awg_s4 if settings.awg_s4 is not None else 0)
+            h1 = conf_values.get('H1') or settings.awg_h1 or '1'
+            h2 = conf_values.get('H2') or settings.awg_h2 or '2'
+            h3 = conf_values.get('H3') or settings.awg_h3 or '3'
+            h4 = conf_values.get('H4') or settings.awg_h4 or '4'
 
             conf_lines = [
                 "# Compatible with Amnezia and WireGuard",
