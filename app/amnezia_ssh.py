@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 import paramiko
+import secrets
 
 from .config import Settings
 
@@ -90,6 +91,8 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
         raise RuntimeError("SSH_HOST and SSH_USER must be set to use remote Amnezia")
 
     priv, pub = _generate_keypair()
+    # generate preshared key for the peer (base64)
+    psk = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
 
     def _work():
         client = _ssh_connect(settings)
@@ -129,12 +132,13 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 prefix = '10.8.1'
             client_ip = _find_next_ip(dump, prefix, start)
 
-            # add peer
-            add_cmd = f"docker exec {container} wg set {iface} peer {base64.b64decode(pub).hex()} allowed-ips {client_ip}/32"
-            # The above assumes server accepts raw pubkey in binary hex, but many wg tools expect base64 pubkey.
-            # Instead, pass the base64 pubkey directly.
-            add_cmd = f"docker exec {container} wg set {iface} peer {pub} allowed-ips {client_ip}/32"
-            _run_ssh(add_cmd, client)
+            # add peer and set preshared key inside the container safely
+            # write PSK to a temporary file with restrictive permissions, apply, then remove
+            set_cmd = (
+                f"docker exec {container} sh -c \"umask 077; echo '{psk}' > /tmp/peer_psk; chmod 600 /tmp/peer_psk; "
+                f"wg set {iface} peer '{pub}' preshared-key /tmp/peer_psk allowed-ips {client_ip}/32; rm -f /tmp/peer_psk\""
+            )
+            _run_ssh(set_cmd, client)
 
             # get server public key if not provided
             server_pub = settings.wg_server_public_key
@@ -192,13 +196,13 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 "",
                 "[Peer]",
                 f"PublicKey = {server_pub or ''}",
-                "PresharedKey = ",
+                f"PresharedKey = {psk}",
                 f"AllowedIPs = {settings.wg_allowed_ips or '0.0.0.0/0'}",
                 f"Endpoint = {endpoint_host}:{endpoint_port}",
                 f"PersistentKeepalive = {settings.awg_jc or 25}",
             ]
             conf_text = "\n".join(conf_lines)
-            return conf_text, {"client_ip": client_ip}
+            return conf_text, {"client_ip": client_ip, "preshared_key": psk}
         finally:
             client.close()
 
