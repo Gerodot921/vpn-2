@@ -162,6 +162,25 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 # include dumps for debugging
                 raise RuntimeError(f"Failed to add peer: wg dump did not change. before:\n{before_dump}\nafter:\n{after_dump}")
 
+            # Ensure MASQUERADE for the client network exists on the host so traffic is NATed
+            try:
+                masq_subnet = f"{prefix}.0/24"
+                check_cmd = f"iptables -t nat -C POSTROUTING -s {masq_subnet} ! -o {iface} -j MASQUERADE"
+                try:
+                    _run_ssh(check_cmd, client)
+                    masq_added = False
+                except Exception:
+                    # try to add without sudo first, then with sudo fallback
+                    add_cmd = f"iptables -t nat -A POSTROUTING -s {masq_subnet} ! -o {iface} -j MASQUERADE"
+                    try:
+                        _run_ssh(add_cmd, client)
+                        masq_added = True
+                    except Exception:
+                        _run_ssh(f"sudo {add_cmd}", client)
+                        masq_added = True
+            except Exception:
+                masq_added = False
+
             # get server public key (mandatory)
             server_pub = settings.wg_server_public_key
             if not server_pub:
@@ -231,7 +250,7 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 "PersistentKeepalive = 25",
             ]
             conf_text = "\n".join(conf_lines)
-            return conf_text, {"client_ip": client_ip, "preshared_key": psk, "applied": True}
+            return conf_text, {"client_ip": client_ip, "preshared_key": psk, "applied": True, "masquerade_added": masq_added}
         finally:
             client.close()
 
