@@ -70,6 +70,25 @@ def _parse_wg_conf(conf_text: str) -> dict[str, str]:
     return out
 
 
+def _extract_interface_conf(client: paramiko.SSHClient, container: str, iface: str) -> dict[str, str]:
+    """Try multiple sources to read current interface config from container."""
+    commands = [
+        f"docker exec {container} wg showconf {iface}",
+        f"docker exec {container} cat /opt/amnezia/awg/{iface}.conf",
+        f"docker exec {container} cat /etc/wireguard/{iface}.conf",
+    ]
+    for cmd in commands:
+        try:
+            conf_text = _run_ssh(cmd, client)
+            if conf_text:
+                parsed = _parse_wg_conf(conf_text)
+                if parsed:
+                    return parsed
+        except Exception:
+            continue
+    return {}
+
+
 def _find_next_ip(dump_output: str, prefix: str, start_octet: int) -> str:
     used = set()
     for line in dump_output.splitlines():
@@ -100,19 +119,7 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
             container = settings.wg_docker_container or "amnezia-awg"
             iface = settings.wg_interface_name or "wg0"
 
-            # try read wg0.conf inside container to extract server AWG params
-            conf_text = None
-            try:
-                conf_text = _run_ssh(f"docker exec {container} cat /opt/amnezia/awg/wg0.conf", client)
-            except Exception:
-                conf_text = None
-
-            conf_values: dict[str, str] = {}
-            if conf_text:
-                try:
-                    conf_values = _parse_wg_conf(conf_text)
-                except Exception:
-                    conf_values = {}
+            conf_values = _extract_interface_conf(client, container, iface)
 
             # get existing peers dump
             dump_cmd = f"docker exec {container} wg show {iface} dump || true"
@@ -206,6 +213,8 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 f"MTU = {mtu}",
                 f"S1 = {s1}",
                 f"S2 = {s2}",
+                f"S3 = {s3}",
+                f"S4 = {s4}",
                 f"Jc = {jc}",
                 f"Jmin = {jmin}",
                 f"Jmax = {jmax}",
@@ -219,7 +228,7 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 f"PresharedKey = {psk}",
                 f"AllowedIPs = {settings.wg_allowed_ips or '0.0.0.0/0'}",
                 f"Endpoint = {endpoint_host}:{endpoint_port}",
-                f"PersistentKeepalive = {settings.awg_jc or 25}",
+                "PersistentKeepalive = 25",
             ]
             conf_text = "\n".join(conf_lines)
             return conf_text, {"client_ip": client_ip, "preshared_key": psk, "applied": True}
