@@ -73,6 +73,10 @@ async def _generate_and_send(message: Message, state: FSMContext, client: Genera
     i1_ref = data.get("i1_ref")
     i1_raw = data.get("i1_raw")
 
+    # Get server public key from settings if available
+    settings = Settings.from_env()
+    server_pub = settings.wg_server_public_key or ""
+
     request = GenerationRequest(
         mode=mode,
         template=template,
@@ -82,6 +86,7 @@ async def _generate_and_send(message: Message, state: FSMContext, client: Genera
         keepalive=keepalive,
         i1=i1_raw,
         i1_ref=i1_ref,
+        server_public_key=server_pub,
     )
 
     await message.answer("Генерирую конфиг и готовлю файл для отправки...")
@@ -120,6 +125,11 @@ async def start(message: Message) -> None:
 async def quickconfig(message: Message, client: GeneratorClient) -> None:
     """Generate and send config instantly with default parameters."""
     await message.answer("Генерирую конфиг с параметрами по умолчанию...")
+    
+    # Try to get server public key from settings
+    settings = Settings.from_env()
+    server_pub = settings.wg_server_public_key or ""
+    
     request = GenerationRequest(
         mode="legacy",
         template=DEFAULTS["legacy"]["template"],
@@ -129,6 +139,7 @@ async def quickconfig(message: Message, client: GeneratorClient) -> None:
         keepalive=None,
         i1=None,
         i1_ref=None,
+        server_public_key=server_pub,
     )
     try:
         conf_text, meta = await client.generate(request)

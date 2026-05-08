@@ -22,6 +22,7 @@ class GenerationRequest:
     plain_address: bool = False
     router: bool = False
     cps: str | None = None
+    server_public_key: str | None = None
 
 
 class GeneratorClient:

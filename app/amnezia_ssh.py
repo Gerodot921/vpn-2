@@ -155,25 +155,30 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 # include dumps for debugging
                 raise RuntimeError(f"Failed to add peer: wg dump did not change. before:\n{before_dump}\nafter:\n{after_dump}")
 
-            # get server public key if not provided
+            # get server public key (mandatory)
             server_pub = settings.wg_server_public_key
             if not server_pub:
                 try:
-                    server_pub = _run_ssh(f"docker exec {container} wg show {iface} public-key", client).strip()
-                except Exception:
-                    server_pub = None
+                    server_pub = _run_ssh(f"docker exec {container} wg show {iface} public-key", client)
+                    if server_pub:
+                        server_pub = server_pub.strip()
+                except Exception as exc:
+                    raise RuntimeError(f"Failed to retrieve server public key: {exc}")
+            if not server_pub:
+                raise RuntimeError("Server public key is empty or not configured")
 
             # Determine endpoint host/port
-            endpoint_host = settings.wg_endpoint_host or conf_values.get('ListenPort') and settings.wg_endpoint_host or settings.ssh_host or ''
-            # prefer explicit env port, else use ListenPort from conf
-            endpoint_port = settings.wg_endpoint_port or None
+            endpoint_host = settings.wg_endpoint_host or settings.ssh_host
+            if not endpoint_host:
+                raise RuntimeError("WG_ENDPOINT_HOST or SSH_HOST must be set to generate client config")
+            endpoint_port = settings.wg_endpoint_port
             if not endpoint_port and conf_values.get('ListenPort'):
                 try:
                     endpoint_port = int(conf_values.get('ListenPort'))
                 except Exception:
                     endpoint_port = None
             if not endpoint_port:
-                endpoint_port = 0
+                raise RuntimeError("WG_ENDPOINT_PORT or ListenPort from server config must be set")
 
             # Build config text (include AWG/legacy obfuscation fields to be Amnezia-compatible)
             dns = settings.wg_dns or conf_values.get('DNS') or "1.1.1.1,8.8.8.8"

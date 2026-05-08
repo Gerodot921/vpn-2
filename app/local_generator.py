@@ -33,6 +33,7 @@ class LocalGenerator:
         address = request.peer_endpoint or "10.8.1.125/32"
         dns = request.dns or "1.1.1.1,8.8.8.8"
         keepalive = request.keepalive or 25
+        server_public_key = request.server_public_key or ""
 
         conf_lines = [
             "#",
@@ -53,7 +54,7 @@ class LocalGenerator:
             "H4 = 763917897",
             "",
             "[Peer]",
-            f"PublicKey = {pub}",
+            f"PublicKey = {server_public_key}",
             f"PresharedKey = {psk}",
             "AllowedIPs = 0.0.0.0/0",
             "Endpoint = 82.25.185.181:49983",
