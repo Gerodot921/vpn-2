@@ -106,10 +106,21 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
             endpoint_host = settings.wg_endpoint_host or ""
             endpoint_port = settings.wg_endpoint_port or 0
 
-            # Build config text
+            # Build config text (include AWG/legacy obfuscation fields to be Amnezia-compatible)
             dns = settings.wg_dns or "1.1.1.1,8.8.8.8"
             mtu = settings.wg_mtu or 1280
-            keepalive = settings.awg_jc or 25
+
+            jc = settings.awg_jc or 6
+            jmin = settings.awg_jmin or 10
+            jmax = settings.awg_jmax or 50
+            s1 = settings.awg_s1 if settings.awg_s1 is not None else 0
+            s2 = settings.awg_s2 if settings.awg_s2 is not None else 0
+            s3 = settings.awg_s3 if settings.awg_s3 is not None else 16
+            s4 = settings.awg_s4 if settings.awg_s4 is not None else 0
+            h1 = settings.awg_h1 or '1'
+            h2 = settings.awg_h2 or '2'
+            h3 = settings.awg_h3 or '3'
+            h4 = settings.awg_h4 or '4'
 
             conf_lines = [
                 "# Compatible with Amnezia and WireGuard",
@@ -118,13 +129,22 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 f"Address = {client_ip}/32",
                 f"DNS = {dns}",
                 f"MTU = {mtu}",
+                f"S1 = {s1}",
+                f"S2 = {s2}",
+                f"Jc = {jc}",
+                f"Jmin = {jmin}",
+                f"Jmax = {jmax}",
+                f"H1 = {h1}",
+                f"H2 = {h2}",
+                f"H3 = {h3}",
+                f"H4 = {h4}",
                 "",
                 "[Peer]",
                 f"PublicKey = {server_pub or ''}",
                 "PresharedKey = ",
                 f"AllowedIPs = {settings.wg_allowed_ips or '0.0.0.0/0'}",
                 f"Endpoint = {endpoint_host}:{endpoint_port}",
-                f"PersistentKeepalive = {keepalive}",
+                f"PersistentKeepalive = {settings.awg_jc or 25}",
             ]
             conf_text = "\n".join(conf_lines)
             return conf_text, {"client_ip": client_ip}
