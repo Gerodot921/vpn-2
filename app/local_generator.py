@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 import base64
 import json
+import secrets
 
 from nacl import public, encoding
 
@@ -17,10 +18,16 @@ def _generate_keypair() -> tuple[str, str]:
     return priv_b64, pub_b64
 
 
+def _generate_psk() -> str:
+    raw = secrets.token_bytes(32)
+    return base64.b64encode(raw).decode("ascii")
+
+
 class LocalGenerator:
     async def generate(self, request: GenerationRequest) -> tuple[str, dict[str, Any]]:
         # Simple local generator producing a WireGuard-like config compatible with Amnezia
         priv, pub = _generate_keypair()
+        psk = _generate_psk()
 
         # Format addresses and defaults
         address = request.peer_endpoint or "10.8.1.125/32"
@@ -35,26 +42,24 @@ class LocalGenerator:
             f"Address = {address}",
             f"DNS = {dns}",
             "MTU = 1280",
-            "Jc = 6",
+            "S1 = 38",
+            "S2 = 108",
+            "Jc = 3",
             "Jmin = 10",
             "Jmax = 50",
-            "S1 = 128",
-            "S2 = 76",
-            "S3 = 16",
-            "S4 = 10",
-            "H1 = 161633421-978891746",
-            "H2 = 1580984436-185454594",
-            "H3 = 2042084841-2112482583",
-            "H4 = 2137803850-2140481769",
+            "H1 = 1240115562",
+            "H2 = 2066276037",
+            "H3 = 723255589",
+            "H4 = 763917897",
             "",
             "[Peer]",
             f"PublicKey = {pub}",
-            "PresharedKey = ",
+            f"PresharedKey = {psk}",
             "AllowedIPs = 0.0.0.0/0",
             "Endpoint = 82.25.185.181:49983",
             f"PersistentKeepalive = {keepalive}",
         ]
 
         conf_text = "\n".join(conf_lines)
-        meta = {"generated": True}
+        meta = {"generated": True, "preshared_key": psk}
         return conf_text, meta
