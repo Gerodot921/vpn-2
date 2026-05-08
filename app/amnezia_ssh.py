@@ -132,6 +132,9 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 prefix = '10.8.1'
             client_ip = _find_next_ip(dump, prefix, start)
 
+            # get dump before change for comparison
+            before_dump = _run_ssh(dump_cmd, client)
+
             # add peer and set preshared key inside the container safely
             # write PSK to a temporary file with restrictive permissions, apply, then remove
             set_cmd = (
@@ -139,6 +142,18 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 f"wg set {iface} peer '{pub}' preshared-key /tmp/peer_psk allowed-ips {client_ip}/32; rm -f /tmp/peer_psk\""
             )
             _run_ssh(set_cmd, client)
+
+            # get dump after change and verify peer exists
+            after_dump = _run_ssh(dump_cmd, client)
+            # success if pub (base64) or client_ip present in after_dump and wasn't in before_dump
+            added = False
+            if pub in after_dump and pub not in before_dump:
+                added = True
+            elif re.search(rf"{re.escape(client_ip)}/32", after_dump) and not re.search(rf"{re.escape(client_ip)}/32", before_dump):
+                added = True
+            if not added:
+                # include dumps for debugging
+                raise RuntimeError(f"Failed to add peer: wg dump did not change. before:\n{before_dump}\nafter:\n{after_dump}")
 
             # get server public key if not provided
             server_pub = settings.wg_server_public_key
@@ -202,7 +217,7 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 f"PersistentKeepalive = {settings.awg_jc or 25}",
             ]
             conf_text = "\n".join(conf_lines)
-            return conf_text, {"client_ip": client_ip, "preshared_key": psk}
+            return conf_text, {"client_ip": client_ip, "preshared_key": psk, "applied": True}
         finally:
             client.close()
 
