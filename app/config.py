@@ -43,6 +43,8 @@ class Settings:
     awg_jmax: int | None = None
     awg_s1: int | None = None
     awg_s2: int | None = None
+    awg_s3: int | None = None
+    awg_s4: int | None = None
     awg_h1: int | None = None
     awg_h2: int | None = None
     awg_h3: int | None = None
@@ -83,6 +85,8 @@ class Settings:
         awg_jmax = int(os.getenv("WIREGUARD_AWG_JMAX")) if os.getenv("WIREGUARD_AWG_JMAX") else None
         awg_s1 = int(os.getenv("WIREGUARD_AWG_S1")) if os.getenv("WIREGUARD_AWG_S1") else None
         awg_s2 = int(os.getenv("WIREGUARD_AWG_S2")) if os.getenv("WIREGUARD_AWG_S2") else None
+        awg_s3 = int(os.getenv("WIREGUARD_AWG_S3")) if os.getenv("WIREGUARD_AWG_S3") else None
+        awg_s4 = int(os.getenv("WIREGUARD_AWG_S4")) if os.getenv("WIREGUARD_AWG_S4") else None
         awg_h1 = int(os.getenv("WIREGUARD_AWG_H1")) if os.getenv("WIREGUARD_AWG_H1") else None
         awg_h2 = int(os.getenv("WIREGUARD_AWG_H2")) if os.getenv("WIREGUARD_AWG_H2") else None
         awg_h3 = int(os.getenv("WIREGUARD_AWG_H3")) if os.getenv("WIREGUARD_AWG_H3") else None
@@ -111,6 +115,8 @@ class Settings:
             awg_jmax=awg_jmax,
             awg_s1=awg_s1,
             awg_s2=awg_s2,
+            awg_s3=awg_s3,
+            awg_s4=awg_s4,
             awg_h1=awg_h1,
             awg_h2=awg_h2,
             awg_h3=awg_h3,
