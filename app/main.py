@@ -87,6 +87,8 @@ async def _generate_and_send(message: Message, state: FSMContext, client: Genera
         i1=i1_raw,
         i1_ref=i1_ref,
         server_public_key=server_pub,
+        endpoint_host=settings.wg_endpoint_host,
+        endpoint_port=settings.wg_endpoint_port,
     )
 
     await message.answer("Генерирую конфиг и готовлю файл для отправки...")
@@ -140,6 +142,8 @@ async def quickconfig(message: Message, client: GeneratorClient) -> None:
         i1=None,
         i1_ref=None,
         server_public_key=server_pub,
+        endpoint_host=settings.wg_endpoint_host,
+        endpoint_port=settings.wg_endpoint_port,
     )
     try:
         conf_text, meta = await client.generate(request)

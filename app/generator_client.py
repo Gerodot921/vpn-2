@@ -23,6 +23,8 @@ class GenerationRequest:
     router: bool = False
     cps: str | None = None
     server_public_key: str | None = None
+    endpoint_host: str | None = None
+    endpoint_port: int | None = None
 
 
 class GeneratorClient:

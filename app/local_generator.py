@@ -34,6 +34,9 @@ class LocalGenerator:
         dns = request.dns or "1.1.1.1,8.8.8.8"
         keepalive = request.keepalive or 25
         server_public_key = request.server_public_key or ""
+        endpoint_host = request.endpoint_host or "unknown.vpn"
+        endpoint_port = request.endpoint_port or 51820
+        endpoint = f"{endpoint_host}:{endpoint_port}"
 
         conf_lines = [
             "#",
@@ -57,7 +60,7 @@ class LocalGenerator:
             f"PublicKey = {server_public_key}",
             f"PresharedKey = {psk}",
             "AllowedIPs = 0.0.0.0/0",
-            "Endpoint = 82.25.185.181:49983",
+            f"Endpoint = {endpoint}",
             f"PersistentKeepalive = {keepalive}",
         ]
 
