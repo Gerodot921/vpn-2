@@ -181,6 +181,22 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
             except Exception:
                 masq_added = False
 
+            # Optional: collect network debug info (endpoints, handshakes, transfer)
+            network_debug: dict[str, str] = {}
+            if settings.debug_network:
+                try:
+                    endpoints_cmd = f"docker exec {container} wg show {iface} endpoints || true"
+                    latest_cmd = f"docker exec {container} wg show {iface} latest-handshakes || true"
+                    transfer_cmd = f"docker exec {container} wg show {iface} transfer || true"
+                    endpoints_out = _run_ssh(endpoints_cmd, client)
+                    latest_out = _run_ssh(latest_cmd, client)
+                    transfer_out = _run_ssh(transfer_cmd, client)
+                    network_debug["endpoints"] = endpoints_out
+                    network_debug["latest_handshakes"] = latest_out
+                    network_debug["transfer"] = transfer_out
+                except Exception as exc:
+                    network_debug["error"] = str(exc)
+
             # get server public key (mandatory)
             server_pub = settings.wg_server_public_key
             if not server_pub:
@@ -250,7 +266,10 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 "PersistentKeepalive = 25",
             ]
             conf_text = "\n".join(conf_lines)
-            return conf_text, {"client_ip": client_ip, "preshared_key": psk, "applied": True, "masquerade_added": masq_added}
+            meta: dict[str, Any] = {"client_ip": client_ip, "preshared_key": psk, "applied": True, "masquerade_added": masq_added}
+            if network_debug:
+                meta["network_debug"] = network_debug
+            return conf_text, meta
         finally:
             client.close()
 

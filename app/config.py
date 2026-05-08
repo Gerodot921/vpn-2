@@ -49,6 +49,7 @@ class Settings:
     awg_h2: int | None = None
     awg_h3: int | None = None
     awg_h4: int | None = None
+    debug_network: bool = False
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -91,6 +92,7 @@ class Settings:
         awg_h2 = int(os.getenv("WIREGUARD_AWG_H2")) if os.getenv("WIREGUARD_AWG_H2") else None
         awg_h3 = int(os.getenv("WIREGUARD_AWG_H3")) if os.getenv("WIREGUARD_AWG_H3") else None
         awg_h4 = int(os.getenv("WIREGUARD_AWG_H4")) if os.getenv("WIREGUARD_AWG_H4") else None
+        debug_network = os.getenv("DEBUG_NETWORK", "").lower() in ("1", "true", "yes")
 
         return cls(
             bot_token=bot_token,
@@ -121,4 +123,5 @@ class Settings:
             awg_h2=awg_h2,
             awg_h3=awg_h3,
             awg_h4=awg_h4,
+            debug_network=debug_network,
         )
