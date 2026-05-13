@@ -266,10 +266,93 @@ async def create_peer(settings: Settings) -> tuple[str, dict[str, Any]]:
                 "PersistentKeepalive = 25",
             ]
             conf_text = "\n".join(conf_lines)
-            meta: dict[str, Any] = {"client_ip": client_ip, "preshared_key": psk, "applied": True, "masquerade_added": masq_added}
+            meta: dict[str, Any] = {"client_ip": client_ip, "preshared_key": psk, "public_key": pub, "applied": True, "masquerade_added": masq_added}
             if network_debug:
                 meta["network_debug"] = network_debug
+            # attempt to persist peer to wg0.conf inside container for persistence across restarts
+            try:
+                # append peer block to the on-disk wg config if writable
+                conf_path = f"/opt/amnezia/awg/{iface}.conf"
+                peer_block = (
+                    "\n[Peer]\n"
+                    f"PublicKey = {pub}\n"
+                    f"PresharedKey = {psk}\n"
+                    f"AllowedIPs = {client_ip}/32\n"
+                )
+                append_cmd = f"docker exec {container} sh -c \"umask 077; echo '{peer_block}' >> {conf_path} || true\""
+                _run_ssh(append_cmd, client)
+                # try to sync runtime with disk config (wg syncconf may exist)
+                try:
+                    _run_ssh(f"docker exec {container} wg syncconf {iface} {conf_path}", client)
+                except Exception:
+                    # ignore if syncconf unavailable
+                    pass
+            except Exception:
+                # non-fatal: continue even if persisting fails
+                pass
+
             return conf_text, meta
+        finally:
+            client.close()
+
+    return await asyncio.to_thread(_work)
+
+
+async def apply_peer(settings: Settings, public_key: str, preshared_key: str, client_ip: str) -> dict[str, Any]:
+    """Apply an existing peer (public key + preshared key + ip) to the Amnezia interface."""
+    if not settings.ssh_host or not settings.ssh_user:
+        raise RuntimeError("SSH_HOST and SSH_USER must be set to use remote Amnezia")
+
+    def _work():
+        client = _ssh_connect(settings)
+        try:
+            container = settings.wg_docker_container or "amnezia-awg"
+            iface = settings.wg_interface_name or "wg0"
+
+            # add the PSK to a temporary file and set the peer
+            set_cmd = (
+                f"docker exec {container} sh -c \"umask 077; echo '{preshared_key}' > /tmp/peer_psk; chmod 600 /tmp/peer_psk; "
+                f"wg set {iface} peer '{public_key}' preshared-key /tmp/peer_psk allowed-ips {client_ip}/32; rm -f /tmp/peer_psk\""
+            )
+            _run_ssh(set_cmd, client)
+
+            # persist to wg0.conf
+            try:
+                conf_path = f"/opt/amnezia/awg/{iface}.conf"
+                peer_block = (
+                    "\n[Peer]\n"
+                    f"PublicKey = {public_key}\n"
+                    f"PresharedKey = {preshared_key}\n"
+                    f"AllowedIPs = {client_ip}/32\n"
+                )
+                append_cmd = f"docker exec {container} sh -c \"umask 077; echo '{peer_block}' >> {conf_path} || true\""
+                _run_ssh(append_cmd, client)
+                try:
+                    _run_ssh(f"docker exec {container} wg syncconf {iface} {conf_path}", client)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+            # ensure MASQUERADE exists
+            masq_added = False
+            try:
+                masq_subnet = f"{'.'.join(client_ip.split('.')[:3])}.0/24"
+                check_cmd = f"iptables -t nat -C POSTROUTING -s {masq_subnet} ! -o {iface} -j MASQUERADE"
+                try:
+                    _run_ssh(check_cmd, client)
+                except Exception:
+                    add_cmd = f"iptables -t nat -A POSTROUTING -s {masq_subnet} ! -o {iface} -j MASQUERADE"
+                    try:
+                        _run_ssh(add_cmd, client)
+                        masq_added = True
+                    except Exception:
+                        _run_ssh(f"sudo {add_cmd}", client)
+                        masq_added = True
+            except Exception:
+                masq_added = False
+
+            return {"applied": True, "masquerade_added": masq_added}
         finally:
             client.close()
 

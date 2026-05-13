@@ -1,0 +1,15 @@
+[Unit]
+Description=Amnezia Backend Service
+After=network.target docker.service
+
+[Service]
+User=root
+WorkingDirectory=/srv/amnezia
+# Run the docker-compose prod stack (ensure docker-compose is available)
+ExecStart=/usr/bin/docker compose -f /srv/amnezia/docker-compose.prod.yml up
+ExecStop=/usr/bin/docker compose -f /srv/amnezia/docker-compose.prod.yml down
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
