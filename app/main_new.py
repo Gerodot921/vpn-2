@@ -10,6 +10,7 @@ import uuid
 import qrcode
 from io import BytesIO
 
+import aiohttp
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
@@ -26,7 +27,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = Router()
-
 
 
 @router.message(CommandStart())

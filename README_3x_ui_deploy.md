@@ -7,7 +7,12 @@
   - Установите Docker и docker-compose.
 
 2) Клонирование репозитория и конфигурация
-  - Клонируйте этот репозиторий и скопируйте `.env` с нужными переменными:
+  - Клонируйте этот репозиторий в `~/vpn-2` или используйте уже существующую папку, где у тебя лежит код.
+  - Скопируйте `.env.example` в `.env` и заполните значения:
+
+```bash
+cp .env.example .env
+```
 
     TELEGRAM_BOT_TOKEN=...
     SSH_HOST=your.amnezia.host
@@ -22,7 +27,7 @@
   - Быстрый запуск (локально):
 
 ```bash
-docker-compose up -d --build backend
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
   - Для продакшна рекомендую использовать Postgres (заменить `DATABASE_URL`) и запустить через systemd + docker-compose или k8s.
