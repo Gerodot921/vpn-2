@@ -51,6 +51,44 @@ services:
       timeout: 5s
       retries: 3
 
+  # Telegram bot (payments + access issuance)
+  bot:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: vpn_bot
+    command: ["xray-bot"]
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      three-x-ui:
+        condition: service_started
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      PAYMENT_PROVIDER_TOKEN: ${PAYMENT_PROVIDER_TOKEN:-}
+      BILLING_CURRENCY: ${BILLING_CURRENCY:-USD}
+      TELEGRAM_MINI_APP_URL: ${TELEGRAM_MINI_APP_URL:-http://backend:8000/miniapp}
+      THREE_X_UI_HOST: three-x-ui
+      THREE_X_UI_PORT: 2053
+      THREE_X_UI_BASE_PATH: ${THREE_X_UI_BASE_PATH:-}
+      THREE_X_UI_USERNAME: ${THREE_X_UI_USERNAME:-admin}
+      THREE_X_UI_PASSWORD: ${THREE_X_UI_PASSWORD:-admin123}
+      THREE_X_UI_INBOUND_TAG: ${THREE_X_UI_INBOUND_TAG:-bot-vless}
+      THREE_X_UI_INBOUND_PORT: ${THREE_X_UI_INBOUND_PORT:-11000}
+      THREE_X_UI_INBOUND_PROTOCOL: ${THREE_X_UI_INBOUND_PROTOCOL:-vless}
+      VPN_ENDPOINT_HOST: ${VPN_ENDPOINT_HOST}
+      VPN_ENDPOINT_PORT: ${VPN_ENDPOINT_PORT:-11000}
+      XRAY_API_HOST: xray
+      XRAY_API_PORT: 10085
+      XRAY_ADMIN_SECRET: ${XRAY_ADMIN_SECRET}
+    volumes:
+      - ./app:/app/app
+    networks:
+      - vpn_network
+    healthcheck:
+      disable: true
+
   # Xray VPN server
   xray:
     image: teddysun/xray:latest
@@ -78,6 +116,7 @@ services:
     container_name: vpn_three_x_ui
     ports:
       - "7654:2053"  # Internal 3x-ui port
+      - "11000:11000"  # Purchased VPN inbound (bot-managed VLESS server)
     volumes:
       - three_x_ui_data:/etc/x-ui
     environment:

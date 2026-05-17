@@ -2,6 +2,7 @@ import os
 import logging
 import uuid
 from fastapi import FastAPI, Depends, HTTPException, Response
+from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import timedelta
@@ -12,6 +13,7 @@ from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 from . import database, crud, schemas, auth
 from .auth import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_current_user
 from .models import User as _User
+from .miniapp import build_miniapp_html
 
 app = FastAPI(
     title="Xray VPN Control API",
@@ -60,6 +62,16 @@ async def prometheus_middleware(request, call_next):
 @app.get("/metrics")
 def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@app.get("/miniapp", response_class=HTMLResponse)
+def miniapp():
+    return build_miniapp_html()
+
+
+@app.get("/miniapp/", response_class=HTMLResponse)
+def miniapp_slash():
+    return build_miniapp_html()
 
 
 @app.get("/health")
