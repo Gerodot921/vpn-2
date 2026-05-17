@@ -67,7 +67,7 @@ services:
       - vpn_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:10085/api/stats"]
+      test: ["CMD-SHELL", "pidof xray >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 3

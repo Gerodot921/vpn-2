@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Any, Optional
 
 
@@ -8,6 +8,8 @@ class PeerCreate(BaseModel):
 
 
 class PeerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     public_key: str
     preshared_key: Optional[str]
@@ -16,9 +18,6 @@ class PeerOut(BaseModel):
     masquerade_added: bool
     meta: Optional[Any]
 
-    class Config:
-        orm_mode = True
-
 
 class UserCreate(BaseModel):
     username: str
@@ -26,13 +25,12 @@ class UserCreate(BaseModel):
 
 
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     username: str
     is_active: bool
     is_admin: bool
-
-    class Config:
-        orm_mode = True
 
 
 class Token(BaseModel):
@@ -51,13 +49,12 @@ class PlanCreate(BaseModel):
 
 
 class PlanOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     price_cents: int
     duration_days: int
-
-    class Config:
-        orm_mode = True
 
 
 class SubscribeRequest(BaseModel):

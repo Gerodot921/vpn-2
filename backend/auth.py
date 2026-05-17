@@ -10,11 +10,11 @@ from sqlalchemy.orm import Session
 
 from . import models, database
 
-SECRET_KEY = os.getenv("JWT_SECRET", "change-me-in-prod")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", os.getenv("JWT_SECRET", "change-me-in-prod"))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256", "bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
